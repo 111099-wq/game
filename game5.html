@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <style>
+        /* Remove background from body */
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Set background for canvas (game area) only */
+        canvas {
+            border: 10px solid #f6eded;
+            background-image: url('gg.jpeg'); /* Set the background image for the canvas */
+            background-size: cover; /* Make sure it covers the entire canvas */
+            background-position: center; /* Center the image */
+            display: block; /* Ensure the canvas is displayed as a block element */
+            margin: 0 auto; /* Center the canvas horizontally */
+        }
+
+        button {
+            background-color: #1bbcdc;
+            border: none;
+            color: rgb(11, 11, 11);
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 5px;
+        }
+
+        button:hover {
+            background-color: #25c9f6;
+        }
+
+        #restartBtn {
+            display: none;
+        }
+
+        /* Center the button container */
+        .button-container {
+            text-align: center;
+            width: 480px;
+        }
+    </style>
+</head>
+<body onload="startGame()">
+    <script>
+        // Load sounds
+        var moveSound = new Audio('dj.mp3');
+        var crashSound = new Audio('gs.mp3');
+        var scoreSound = new Audio('');
+
+        var myGamePiece;
+        var myObstacles = [];
+        var myScore;
+        var backgroundImage;
+
+        function startGame() {
+            myGamePiece = new component(30, 30, "red", 10, 120);
+            myScore = new component("30px", "Consolas", "white", 280, 40, "text");
+            myGameArea.start();
+            document.getElementById('restartBtn').style.display = 'none'; // Hide restart button initially
+        }
+
+        var myGameArea = {
+            canvas: document.createElement("canvas"),
+
+            start: function () {
+                this.canvas.width = 480;
+                this.canvas.height = 270;
+                this.context = this.canvas.getContext("2d");
+                document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+                this.frameNo = 0;
+                this.interval = setInterval(updateGameArea, 20);
+            },
+
+            clear: function () {
+                this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            },
+
+            stop: function () {
+                clearInterval(this.interval);
+                document.getElementById('restartBtn').style.display = 'inline'; // Show restart button when game over
+                // Show final score on canvas
+                this.context.font = "30px Arial";
+                this.context.fillStyle = "white";
+                this.context.fillText("Game Over", this.canvas.width / 2 - 90, this.canvas.height / 2 - 20);
+                this.context.fillText("Final Score: " + myGameArea.frameNo, this.canvas.width / 2 - 120, this.canvas.height / 2 + 20);
+            },
+
+            drawBackground: function () {
+                // The background image is already applied in CSS for the canvas element
+            }
+        }
+
+        // Component setup for game objects
+        function component(width, height, color, x, y, type) {
+            this.type = type;
+            this.width = width;
+            this.height = height;
+            this.speedX = 0;
+            this.speedY = 0;
+            this.x = x;
+            this.y = y;
+            this.update = function () {
+                ctx = myGameArea.context;
+                if (this.type == "text") {
+                    ctx.font = this.width + " " + this.height;
+                    ctx.fillStyle = color;
+                    ctx.fillText(this.text, this.x, this.y);
+                } else {
+                    ctx.fillStyle = color;
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+            }
+            this.newPos = function () {
+                this.x += this.speedX;
+                this.y += this.speedY;
+            }
+            this.crashWith = function (otherobj) {
+                var myleft = this.x;
+                var myright = this.x + (this.width);
+                var mytop = this.y;
+                var mybottom = this.y + (this.height);
+                var otherleft = otherobj.x;
+                var otherright = otherobj.x + (otherobj.width);
+                var othertop = otherobj.y;
+                var otherbottom = otherobj.y + (otherobj.height);
+                var crash = true;
+                if ((mybottom < othertop) || (mytop > otherbottom) || (myright < otherleft) || (myleft > otherright)) {
+                    crash = false;
+                }
+                return crash;
+            }
+        }
+
+        function updateGameArea() {
+            var x, height, gap, minHeight, maxHeight, minGap, maxGap;
+            myGameArea.clear();
+            myGameArea.frameNo += 1;
+            
+            // Create obstacles every few frames
+            if (myGameArea.frameNo == 1 || everyinterval(150)) {
+                x = myGameArea.canvas.width;
+                minHeight = 20;
+                maxHeight = 200;
+                height = Math.floor(Math.random() * (maxHeight - minHeight + 1) + minHeight);
+                minGap = 50;
+                maxGap = 200;
+                gap = Math.floor(Math.random() * (maxGap - minGap + 1) + minGap);
+                myObstacles.push(new component(25, height, "orange", x, 0));
+                myObstacles.push(new component(20, x - height - gap, "orange", x, height + gap));
+                scoreSound.play();
+            }
+
+            // Update obstacles and check for collisions
+            for (i = 0; i < myObstacles.length; i += 1) {
+                myObstacles[i].speedX = -1;
+                myObstacles[i].newPos();
+                myObstacles[i].update();
+
+                // Check for collision with the player
+                if (myGamePiece.crashWith(myObstacles[i])) {
+                    crashSound.play();  // Play crash sound
+                    myGameArea.stop();  // Stop the game
+                    return;  // Exit the function to stop further execution
+                }
+            }
+
+            myScore.text = "SCORE: " + myGameArea.frameNo;
+            myScore.update();
+            myGamePiece.newPos();
+            myGamePiece.update();
+        }
+
+        function everyinterval(n) {
+            if ((myGameArea.frameNo / n) % 1 == 0) { return true; }
+            return false;
+        }
+
+        // Movement functions
+        function moveup() {
+            myGamePiece.speedY = -1;
+            moveSound.play();
+        }
+
+        function movedown() {
+            myGamePiece.speedY = 1;
+            moveSound.play();
+        }
+
+        function moveleft() {
+            myGamePiece.speedX = -1;
+            moveSound.play();
+        }
+
+        function moveright() {
+            myGamePiece.speedX = 10;
+            moveSound.play();
+        }
+
+        function clearmove() {
+            myGamePiece.speedX = 0;
+            myGamePiece.speedY = 0;
+        }
+
+        // Restart the game
+        function restartGame() {
+            myObstacles = [];
+            myGameArea.frameNo = 0;
+            myGamePiece.x = 10;
+            myGamePiece.y = 120;
+            myGamePiece.speedX = 0;
+            myGamePiece.speedY = 0;
+            myScore.text = "SCORE: 0";
+            myGameArea.start();
+            document.getElementById('restartBtn').style.display = 'none'; // Hide restart button after restart
+        }
+    </script>
+
+    <div class="button-container">
+        <button onmousedown="moveup()" onmouseup="clearmove()" ontouchstart="moveup()">UP</button>
+        <button onmousedown="moveleft()" onmouseup="clearmove()" ontouchstart="moveleft()">LEFT</button>
+        <button onmousedown="moveright()" onmouseup="clearmove()" ontouchstart="moveright()">RIGHT</button>
+        <button onmousedown="movedown()" onmouseup="clearmove()" ontouchstart="movedown()">DOWN</button>
+    </div>
+
+    <button id="restartBtn" onclick="restartGame()">Lagi</button>
+</body>
+</html>
